@@ -1,0 +1,870 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TRIM — Trajectory Refinement for Emission Modeling</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%230891b2'/><text y='.9em' font-size='72' font-family='sans-serif' font-weight='bold' fill='white' x='14'>T</text></svg>" />
+
+  <!-- React + Babel from CDN (no Node.js needed) -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #f4f7f9; color: #0f2d3d; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #f4f7f9; }
+    ::-webkit-scrollbar-thumb { background: #d4e2ec; border-radius: 3px; }
+    input::placeholder, textarea::placeholder { color: #a8c4d0; }
+    .step-row:hover { background: #f0f5f8 !important; }
+    .step-row { transition: background 0.12s; cursor: default; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useRef, useEffect } = React;
+
+    const C = {
+      canvas:   "#f4f7f9",
+      white:    "#ffffff",
+      panelAlt: "#f0f5f8",
+      raised:   "#e8f0f5",
+      border:   "#d4e2ec",
+      borderMd: "#b8d0de",
+      borderHi: "#7fb8d4",
+      teal:     "#0891b2",
+      tealLight:"#e0f2f7",
+      tealMid:  "#38b2c8",
+      tealDark: "#066080",
+      green:    "#16a34a",
+      greenBg:  "#dcfce7",
+      greenMid: "#22c55e",
+      red:      "#dc2626",
+      redBg:    "#fee2e2",
+      amber:    "#d97706",
+      amberBg:  "#fef3c7",
+      text:     "#0f2d3d",
+      textMd:   "#3a5a70",
+      textMute: "#7a9ab0",
+      textHint: "#a8c4d0",
+      shadow:   "rgba(8,145,178,0.10)",
+    };
+
+    const STEPS = [
+      { id: "net_topology",         title: "NET Topology",          sub: "net.xml → topology tables",             optional: false, icon: "⬡" },
+      { id: "xml2csv_fcd",          title: "FCD Parse",             sub: "fcd.xml → CSV trajectory",              optional: false, icon: "⇄" },
+      { id: "identify_neighbors",   title: "Neighbor Detection",    sub: "spatial adjacency analysis",            optional: false, icon: "◎" },
+      { id: "trip_split",           title: "Trip Segmentation",     sub: "assign trip_id per trajectory",         optional: false, icon: "⋯" },
+      { id: "trim_postprocess",     title: "TRIM Optimize",         sub: "trajectory optimization & postprocess", optional: false, icon: "⚡" },
+      { id: "fill_xy",              title: "XY Fill",               sub: "merge & interpolate coordinates",       optional: false, icon: "⊕" },
+      { id: "ef_match",             title: "Emission Factor Match", sub: "EF lookup & vehicle class binding",     optional: false, icon: "◈" },
+      { id: "emission_spatial_map", title: "Spatial Emission Map",  sub: "grid-based emission distribution",      optional: false, icon: "▦" },
+      { id: "emission_compare",     title: "Emission Compare",      sub: "result vs ground truth analysis",       optional: false, icon: "≡" },
+      { id: "sg_smooth",            title: "SG Smooth",             sub: "Savitzky-Golay filter",                 optional: true,  icon: "∿" },
+      { id: "gt_standardize",       title: "GT Standardize",        sub: "normalize ground truth CSV",            optional: true,  icon: "⊞" },
+    ];
+
+    const POLLUTANTS = ["NOx", "PM2.5", "CO", "CO2", "THC"];
+    const now = () => new Date().toLocaleTimeString("en-GB", { hour12: false });
+
+    // ── Components ────────────────────────────────────────────
+
+    function StatusDot({ status }) {
+      const map = {
+        green: { bg: C.greenMid, shadow: "0 0 0 3px #dcfce7" },
+        red:   { bg: C.red,      shadow: "0 0 0 3px #fee2e2" },
+        teal:  { bg: C.teal,     shadow: "0 0 0 3px #e0f2f7" },
+        amber: { bg: C.amber,    shadow: "0 0 0 3px #fef3c7" },
+        gray:  { bg: C.textHint, shadow: "none" },
+      };
+      const s = map[status] || map.gray;
+      return <span style={{ display:"inline-block", width:9, height:9, borderRadius:"50%", background:s.bg, boxShadow:s.shadow, flexShrink:0, transition:"all 0.3s" }} />;
+    }
+
+    function Toggle({ checked, onChange }) {
+      return (
+        <button onClick={() => onChange(!checked)} style={{ width:38, height:21, borderRadius:11, background:checked?C.teal:C.raised, border:`1.5px solid ${checked?C.teal:C.borderMd}`, position:"relative", cursor:"pointer", transition:"all 0.2s", flexShrink:0, padding:0 }}>
+          <span style={{ position:"absolute", top:2, left:checked?18:2, width:13, height:13, borderRadius:"50%", background:checked?"#fff":C.textHint, transition:"left 0.2s", display:"block", boxShadow:"0 1px 3px rgba(0,0,0,0.15)" }} />
+        </button>
+      );
+    }
+
+    function PillCheck({ label, checked, onChange }) {
+      return (
+        <button onClick={() => onChange(!checked)} style={{ padding:"5px 14px", borderRadius:20, border:`1.5px solid ${checked?C.teal:C.border}`, background:checked?C.tealLight:C.white, color:checked?C.tealDark:C.textMute, fontSize:12, fontFamily:"DM Mono, monospace", cursor:"pointer", transition:"all 0.15s", fontWeight:500 }}>
+          {checked && <span style={{ marginRight:5, color:C.teal }}>✓</span>}{label}
+        </button>
+      );
+    }
+
+    function RadioPill({ label, checked, onClick }) {
+      return (
+        <button onClick={onClick} style={{ padding:"5px 16px", borderRadius:20, border:`1.5px solid ${checked?C.green:C.border}`, background:checked?C.greenBg:C.white, color:checked?C.green:C.textMute, fontSize:12, fontFamily:"DM Mono, monospace", cursor:"pointer", transition:"all 0.15s", fontWeight:500 }}>
+          {label}
+        </button>
+      );
+    }
+
+    function SectionHead({ icon, children }) {
+      return (
+        <div style={{ display:"flex", alignItems:"center", marginBottom:16, paddingBottom:10, borderBottom:`1.5px solid ${C.tealLight}` }}>
+          {icon && <span style={{ marginRight:8, fontSize:15 }}>{icon}</span>}
+          <span style={{ fontFamily:"DM Sans, sans-serif", fontWeight:700, fontSize:12, letterSpacing:"0.12em", color:C.tealDark, textTransform:"uppercase" }}>{children}</span>
+        </div>
+      );
+    }
+
+    function InputRow({ label, dotColor, value, onChange, placeholder, onBrowse, onClear }) {
+      const [focus, setFocus] = useState(false);
+      return (
+        <div style={{ display:"grid", gridTemplateColumns:"148px 1fr auto auto", alignItems:"center", gap:8, marginBottom:10 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <StatusDot status={dotColor} />
+            <span style={{ color:C.textMd, fontSize:12, fontFamily:"DM Mono, monospace", fontWeight:500 }}>{label}</span>
+          </div>
+          <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+            onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}
+            style={{ border:`1.5px solid ${focus?C.teal:C.border}`, background:focus?C.white:C.panelAlt, color:C.text, padding:"7px 12px", fontSize:12, fontFamily:"DM Mono, monospace", outline:"none", borderRadius:6, width:"100%", transition:"all 0.15s", boxShadow:focus?`0 0 0 3px ${C.tealLight}`:"none" }}
+          />
+          <button onClick={onBrowse}
+            style={{ padding:"7px 14px", background:C.white, border:`1.5px solid ${C.border}`, color:C.textMd, fontFamily:"DM Sans, sans-serif", fontSize:12, fontWeight:600, cursor:"pointer", borderRadius:6, transition:"all 0.15s", whiteSpace:"nowrap" }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor=C.teal; e.currentTarget.style.color=C.teal; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor=C.border; e.currentTarget.style.color=C.textMd; }}
+          >Browse</button>
+          <button onClick={onClear}
+            style={{ padding:"7px 10px", background:C.white, border:`1.5px solid ${C.border}`, color:C.textHint, fontSize:14, cursor:"pointer", borderRadius:6, transition:"all 0.15s", lineHeight:1 }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor=C.red; e.currentTarget.style.color=C.red; e.currentTarget.style.background=C.redBg; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor=C.border; e.currentTarget.style.color=C.textHint; e.currentTarget.style.background=C.white; }}
+          >✕</button>
+        </div>
+      );
+    }
+
+    function Btn({ children, onClick, disabled, variant="primary", small }) {
+      const [hover, setHover] = useState(false);
+      const v = {
+        primary: { bg:hover&&!disabled?C.tealDark:C.teal, border:C.teal, color:"#fff", shadow:`0 2px 8px ${C.shadow}` },
+        ghost:   { bg:hover&&!disabled?C.tealLight:C.white, border:C.borderMd, color:C.textMd, shadow:"none" },
+        danger:  { bg:hover&&!disabled?C.redBg:C.white, border:C.red, color:C.red, shadow:"none" },
+        resume:  { bg:hover&&!disabled?C.greenBg:C.white, border:C.green, color:C.green, shadow:"none" },
+      }[variant];
+      return (
+        <button onClick={disabled?undefined:onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+          style={{ padding:small?"5px 14px":"8px 20px", background:v.bg, border:`1.5px solid ${v.border}`, color:v.color, fontFamily:"DM Sans, sans-serif", fontWeight:700, fontSize:small?11:13, letterSpacing:"0.04em", cursor:disabled?"not-allowed":"pointer", borderRadius:7, opacity:disabled?0.4:1, transition:"all 0.15s", boxShadow:disabled?"none":v.shadow, whiteSpace:"nowrap" }}
+        >{children}</button>
+      );
+    }
+
+    function StepBadge({ status }) {
+      const cfg = {
+        pending: { bg:C.canvas,  color:C.textHint, border:C.border,   label:"Pending" },
+        running: { bg:C.amberBg, color:C.amber,    border:C.amber,    label:"Running" },
+        done:    { bg:C.greenBg, color:C.green,    border:C.greenMid, label:"Done"    },
+        error:   { bg:C.redBg,   color:C.red,      border:C.red,      label:"Error"   },
+        skipped: { bg:C.canvas,  color:C.textHint, border:C.border,   label:"Skip"    },
+      }[status] || { bg:C.canvas, color:C.textHint, border:C.border, label:"—" };
+      return <span style={{ background:cfg.bg, color:cfg.color, border:`1.5px solid ${cfg.border}`, borderRadius:20, padding:"3px 12px", fontSize:11, fontFamily:"DM Mono, monospace", fontWeight:600 }}>{cfg.label}</span>;
+    }
+
+    function ProgressBar({ steps, stepStatus }) {
+      const done  = steps.filter(s => stepStatus[s.id] === "done").length;
+      const error = steps.filter(s => stepStatus[s.id] === "error").length;
+      const total = steps.length;
+      const pct   = total ? (done / total) * 100 : 0;
+      return (
+        <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:10, padding:"14px 20px", marginBottom:16, display:"flex", alignItems:"center", gap:20 }}>
+          <div style={{ flex:1 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", marginBottom:7 }}>
+              <span style={{ color:C.textMd, fontSize:12, fontFamily:"DM Sans, sans-serif", fontWeight:600 }}>Pipeline Progress</span>
+              <span style={{ color:C.teal, fontSize:12, fontFamily:"DM Mono, monospace" }}>{done} / {total}</span>
+            </div>
+            <div style={{ height:6, background:C.raised, borderRadius:3, overflow:"hidden" }}>
+              <div style={{ height:"100%", width:`${pct}%`, borderRadius:3, background:error>0?`linear-gradient(90deg,${C.teal},${C.red})`:`linear-gradient(90deg,${C.teal},${C.green})`, transition:"width 0.5s ease" }} />
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:16 }}>
+            {[{label:"Done",val:done,color:C.green},{label:"Errors",val:error,color:C.red}].map(({label,val,color}) => (
+              <div key={label} style={{ textAlign:"center" }}>
+                <div style={{ fontSize:18, fontWeight:700, color, fontFamily:"DM Sans, sans-serif" }}>{val}</div>
+                <div style={{ fontSize:10, color:C.textMute, fontFamily:"DM Mono, monospace" }}>{label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ── Main App ──────────────────────────────────────────────
+
+    function App() {
+      const [tab, setTab]           = useState("inputs");
+      const [netXml, setNetXml]     = useState("");
+      const [fcdInput, setFcdInput] = useState("");
+      const [outDir, setOutDir]     = useState("");
+      const [importGt, setImportGt] = useState(false);
+      const [gtCsv, setGtCsv]       = useState("");
+      const [prefix, setPrefix]     = useState("fcd");
+      const [useSg, setUseSg]             = useState(false);
+      const [enablePlots, setEnablePlots] = useState(false);
+      const [plotLimit, setPlotLimit]     = useState("10");
+      const [pollutants, setPollutants]   = useState({ NOx:true, "PM2.5":false, CO:false, CO2:false, THC:false });
+      const [spatialAxis, setSpatialAxis] = useState("both");
+      const [axisbin, setAxisbin]         = useState("10.0");
+      const [enableRoi, setEnableRoi]       = useState(false);
+      const [roiMode, setRoiMode]           = useState("shared");
+      const [roiSim, setRoiSim]             = useState("");
+      const [roiGt, setRoiGt]               = useState("");
+
+      // Time filter states (NEW)
+      const [enableSumoTime, setEnableSumoTime] = useState(false);
+      const [sumoTimeStart, setSumoTimeStart]   = useState("");
+      const [sumoTimeEnd, setSumoTimeEnd]       = useState("");
+      const [enableGtTime, setEnableGtTime]     = useState(false);
+      const [gtTimeStart, setGtTimeStart]       = useState("");
+      const [gtTimeEnd, setGtTimeEnd]           = useState("");
+
+      const [stepEnabled, setStepEnabled] = useState(Object.fromEntries(STEPS.map(s => [s.id, !s.optional])));
+      const [stepStatus, setStepStatus]   = useState(Object.fromEntries(STEPS.map(s => [s.id, "pending"])));
+      const [appStatus, setAppStatus]     = useState("Ready");
+      const [running, setRunning]         = useState(false);
+      const [canResume, setCanResume]     = useState(false);
+      const [logs, setLogs]               = useState([{ ts:now(), type:"info", msg:"TRIM Web UI ready. Configure inputs and press Run All." }]);
+      const consoleRef = useRef(null);
+      const esRef      = useRef(null);
+      const [tick, setTick] = useState(0);
+
+      useEffect(() => { const t = setInterval(() => setTick(x=>x+1), 600); return () => clearInterval(t); }, []);
+      useEffect(() => { if (consoleRef.current) consoleRef.current.scrollTop = consoleRef.current.scrollHeight; }, [logs]);
+
+      // Auto-sync optional steps when GT or SG is enabled
+      useEffect(() => {
+        if (importGt && gtCsv.trim()) {
+          setStepEnabled(prev => ({...prev, gt_standardize: true}));
+        }
+        setStepEnabled(prev => ({...prev, sg_smooth: useSg}));
+      }, [importGt, gtCsv, useSg]);
+
+      // Fetch status periodically (only when needed)
+      useEffect(() => {
+        // Only poll if we might need to check resume capability
+        // (when not running and status might be paused)
+        if (running) {
+          // Don't poll while running (we get events via SSE)
+          return;
+        }
+
+        const checkStatus = () => {
+          fetch("/api/status")
+            .then(r => r.json())
+            .then(data => {
+              if (data.can_resume && !running) {
+                setCanResume(true);
+              } else {
+                setCanResume(false);
+              }
+            })
+            .catch(() => {});
+        };
+
+        // Poll every 5 seconds when idle (reduced from 2s)
+        const interval = setInterval(checkStatus, 5000);
+        checkStatus(); // Initial check
+        return () => clearInterval(interval);
+      }, [running]);
+
+      const addLog = (msg, type="info") => setLogs(prev => [...prev, { ts:now(), type, msg }]);
+
+      const lightNet = () => netXml.trim().endsWith(".xml") ? "green" : netXml.trim() ? "red" : "gray";
+      const lightFcd = () => fcdInput.trim().endsWith(".xml") ? "green" : fcdInput.trim() ? "red" : "gray";
+      const lightOut = () => outDir.trim() ? "green" : "gray";
+      const lightGt  = () => { if (!importGt) return "gray"; return gtCsv.trim().endsWith(".csv") ? "green" : "red"; };
+      const isReady  = lightNet()==="green" && lightFcd()==="green" && lightOut()==="green" && lightGt()!=="red";
+
+      const statusDotColor = () => ({ Done:"green", Error:"red", Stopped:"red", Paused:"amber", Running:"teal" }[appStatus] || "gray");
+
+      function runPipeline(selectedOnly) {
+        if (running) return;
+        // Front-end validation
+        const errs = [];
+        if (!netXml.trim().endsWith(".xml"))  errs.push("net.xml path is missing or invalid");
+        if (!fcdInput.trim().endsWith(".xml")) errs.push("fcd.xml path is missing or invalid");
+        if (!outDir.trim())                    errs.push("output directory is not set");
+        if (importGt && !gtCsv.trim().endsWith(".csv")) errs.push("Ground Truth CSV path is missing");
+
+        // Time filter validation
+        if (enableSumoTime) {
+          const start = parseFloat(sumoTimeStart);
+          const end = parseFloat(sumoTimeEnd);
+          if (sumoTimeStart && sumoTimeEnd && start >= end) {
+            errs.push("SUMO time filter: start must be less than end");
+          }
+        }
+        if (enableGtTime) {
+          const start = parseFloat(gtTimeStart);
+          const end = parseFloat(gtTimeEnd);
+          if (gtTimeStart && gtTimeEnd && start >= end) {
+            errs.push("GT time filter: start must be less than end");
+          }
+        }
+
+        if (errs.length > 0) {
+          setTab("console");
+          errs.forEach(e => addLog("⚠ " + e, "warn"));
+          addLog("Please fix validation errors before running.", "error");
+          return;
+        }
+
+        setRunning(true);
+        setAppStatus("Running");
+        setCanResume(false);
+        setStepStatus(Object.fromEntries(STEPS.map(s => [s.id, "pending"])));
+        setTab("pipeline");
+        addLog("=== Pipeline started ===", "system");
+        const safePrefix = prefix.trim().replace(/\s+/g,"_").replace(/[^A-Za-z0-9._-]+/g,"_").replace(/_+/g,"_").replace(/^[._-]+|[._-]+$/g,"") || "fcd";
+        const axisBinVal = Math.max(0.1, parseFloat(axisbin)||10.0);
+        addLog(`prefix: ${safePrefix}  |  axis: ${spatialAxis}  |  bin: ${axisBinVal}m`, "info");
+        addLog(`pollutants: ${Object.keys(pollutants).filter(k=>pollutants[k]).join(", ")||"none"}`, "info");
+
+        // Connect to FastAPI SSE
+        const params = JSON.stringify({
+          net_xml:netXml, fcd_input:fcdInput, out_dir:outDir,
+          import_gt:importGt, gt_csv:gtCsv, prefix, use_sg:useSg,
+          enable_plots:enablePlots, plot_limit:parseInt(plotLimit)||10,
+          pollutants:Object.keys(pollutants).filter(k=>pollutants[k]),
+          spatial_axis:spatialAxis, axis_bin_size:axisBinVal,
+          spatial_enable_roi:enableRoi,
+          spatial_roi_mode:roiMode,
+          spatial_roi_sim:roiSim,
+          spatial_roi_gt:roiGt,
+          enable_sumo_time_filter:enableSumoTime,
+          sumo_time_start:sumoTimeStart || null,
+          sumo_time_end:sumoTimeEnd || null,
+          enable_gt_time_filter:enableGtTime,
+          gt_time_start:gtTimeStart || null,
+          gt_time_end:gtTimeEnd || null,
+          selected_only:selectedOnly,
+        });
+
+        fetch("/api/prepare", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: params,
+        })
+        .then(r => r.json())
+        .then(({ token }) => {
+          addLog(`📡 Connecting to backend (token: ${token.substring(0,8)}...)`, "info");
+          const es = new EventSource(`/api/run?token=${token}`);
+          esRef.current = es;
+
+          let lastEventTime = Date.now();
+          let heartbeatInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - lastEventTime) / 1000);
+            if (elapsed > 30) {
+              addLog(`⚠️ No events received for ${elapsed}s - connection may be stalled`, "warn");
+            }
+          }, 10000); // Check every 10 seconds
+
+          es.onopen = () => {
+            addLog("✓ Connected to backend", "success");
+            lastEventTime = Date.now();
+          };
+
+          es.onmessage = e => {
+            lastEventTime = Date.now();
+            // Skip heartbeat messages
+            if (e.data.trim() === '' || e.data.startsWith(':')) return;
+
+            const ev = JSON.parse(e.data);
+            console.log('[SSE Event]', ev); // Debug log
+
+            if (ev.type==="log")              addLog(ev.message);
+            if (ev.type==="step_start")       { setStepStatus(p => ({...p,[ev.step_id]:"running"})); addLog(`▶ [${ev.step_id}] ${ev.message}`, "run"); }
+            if (ev.type==="step_done")        { setStepStatus(p => ({...p,[ev.step_id]:"done"})); addLog(`✓ [${ev.step_id}] ${ev.message}`, "success"); }
+            if (ev.type==="step_error")       { setStepStatus(p => ({...p,[ev.step_id]:"error"})); addLog(`✗ [${ev.step_id}] ${ev.message}`, "error"); }
+            if (ev.type==="pipeline_done")    {
+              clearInterval(heartbeatInterval);
+              // Check if this is an error completion (validation or runtime error)
+              const isError = ev.message.toLowerCase().includes('error') || ev.message.toLowerCase().includes('failed');
+              addLog(ev.message, isError ? "error" : "success");
+              setAppStatus(isError ? "Error" : "Done");
+              setRunning(false);
+              setCanResume(false);
+              es.close();
+            }
+            if (ev.type==="pipeline_stopped") {
+              clearInterval(heartbeatInterval);
+              addLog(ev.message, "warn");
+              setAppStatus("Paused");
+              setRunning(false);
+              setCanResume(true);
+              es.close();
+            }
+          };
+
+          es.onerror = (err) => {
+            clearInterval(heartbeatInterval);
+            console.log('[SSE Error]', err);
+            addLog("❌ Connection error — check backend is running.", "error");
+            setRunning(false);
+            setAppStatus("Error");
+            es.close();
+          };
+        })
+        .catch(err => {
+          console.error('[Fetch Error]', err);
+          addLog("Failed to start pipeline: " + err, "error");
+          setRunning(false); setAppStatus("Error");
+        });
+      }
+
+      function resumePipeline() {
+        if (running || !canResume) return;
+        setRunning(true);
+        setAppStatus("Running");
+        setCanResume(false);
+        addLog("=== Resuming pipeline ===", "system");
+
+        fetch("/api/resume", { method:"POST" })
+        .then(r => {
+          if (!r.ok) throw new Error("Resume failed");
+          addLog("📡 Reconnecting to backend for resume...", "info");
+          return r;
+        })
+        .then(() => {
+          const es = new EventSource("/api/resume");
+          esRef.current = es;
+
+          let lastEventTime = Date.now();
+          let heartbeatInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - lastEventTime) / 1000);
+            if (elapsed > 30) {
+              addLog(`⚠️ No events received for ${elapsed}s - connection may be stalled`, "warn");
+            }
+          }, 10000);
+
+          es.onopen = () => {
+            addLog("✓ Resumed connection established", "success");
+            lastEventTime = Date.now();
+          };
+
+          es.onmessage = e => {
+            lastEventTime = Date.now();
+            if (e.data.trim() === '' || e.data.startsWith(':')) return;
+
+            const ev = JSON.parse(e.data);
+            console.log('[SSE Resume Event]', ev);
+
+            if (ev.type==="log")              addLog(ev.message);
+            if (ev.type==="step_start")       { setStepStatus(p => ({...p,[ev.step_id]:"running"})); addLog(`▶ [${ev.step_id}] ${ev.message}`, "run"); }
+            if (ev.type==="step_done")        { setStepStatus(p => ({...p,[ev.step_id]:"done"})); addLog(`✓ [${ev.step_id}] ${ev.message}`, "success"); }
+            if (ev.type==="step_error")       { setStepStatus(p => ({...p,[ev.step_id]:"error"})); addLog(`✗ [${ev.step_id}] ${ev.message}`, "error"); }
+            if (ev.type==="pipeline_done")    {
+              clearInterval(heartbeatInterval);
+              // Check if this is an error completion
+              const isError = ev.message.toLowerCase().includes('error') || ev.message.toLowerCase().includes('failed');
+              addLog(ev.message, isError ? "error" : "success");
+              setAppStatus(isError ? "Error" : "Done");
+              setRunning(false);
+              setCanResume(false);
+              es.close();
+            }
+            if (ev.type==="pipeline_stopped") {
+              clearInterval(heartbeatInterval);
+              addLog(ev.message, "warn");
+              setAppStatus("Paused");
+              setRunning(false);
+              setCanResume(true);
+              es.close();
+            }
+          };
+
+          es.onerror = () => {
+            clearInterval(heartbeatInterval);
+            addLog("Connection error during resume", "error");
+            setRunning(false);
+            setAppStatus("Error");
+            es.close();
+          };
+        })
+        .catch(err => {
+          addLog("Failed to resume: " + err, "error");
+          setRunning(false); setAppStatus("Error");
+        });
+      }
+
+      function stopPipeline() {
+        fetch("/api/stop", { method:"POST" });
+        if (esRef.current) esRef.current.close();
+        setRunning(false); setAppStatus("Paused");
+        setCanResume(true);
+        addLog("Pipeline paused by user — use Resume to continue.", "warn");
+      }
+
+      const logColor = type => ({
+        system:  "#38bdf8",
+        success: "#4ade80",
+        error:   "#f87171",
+        warn:    "#fbbf24",
+        run:     "#67e8f9",
+        info:    "#cbd5e1",
+      }[type] || "#cbd5e1");
+
+      const card = { background:C.white, border:`1px solid ${C.border}`, borderRadius:10, padding:"20px 24px", marginBottom:16, boxShadow:"0 1px 4px rgba(8,145,178,0.06)", position:"relative", overflow:"hidden" };
+
+      const tabStyle = t => ({
+        padding:"13px 22px", fontFamily:"DM Sans, sans-serif", fontWeight:700, fontSize:13, letterSpacing:"0.02em",
+        cursor:"pointer", border:"none", background:tab===t?C.white:"transparent",
+        color:tab===t?C.teal:C.textMute, borderBottom:`2.5px solid ${tab===t?C.teal:"transparent"}`,
+        transition:"all 0.15s", display:"flex", alignItems:"center", gap:7,
+      });
+
+      const inputStyle = { border:`1.5px solid ${C.border}`, background:C.panelAlt, color:C.text, padding:"7px 12px", fontSize:12, fontFamily:"DM Mono, monospace", outline:"none", borderRadius:6, transition:"all 0.15s" };
+
+      return (
+        <div style={{ minHeight:"100vh", background:C.canvas, display:"flex", flexDirection:"column" }}>
+
+          {/* Header */}
+          <header style={{ background:C.white, borderBottom:`1.5px solid ${C.border}`, boxShadow:"0 1px 8px rgba(8,145,178,0.07)", position:"sticky", top:0, zIndex:100 }}>
+            <div style={{ maxWidth:1060, margin:"0 auto", padding:"0 32px", display:"flex", alignItems:"stretch" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:14, paddingRight:40, marginRight:8, borderRight:`1.5px solid ${C.border}` }}>
+                <div style={{ width:38, height:38, borderRadius:9, background:`linear-gradient(135deg,${C.teal},${C.green})`, display:"flex", alignItems:"center", justifyContent:"center", boxShadow:`0 2px 10px ${C.shadow}`, flexShrink:0 }}>
+                  <span style={{ color:"#fff", fontFamily:"DM Sans, sans-serif", fontWeight:800, fontSize:17 }}>T</span>
+                </div>
+                <div>
+                  <div style={{ fontFamily:"DM Sans, sans-serif", fontWeight:800, fontSize:17, color:C.text }}>TRIM</div>
+                  <div style={{ fontFamily:"DM Mono, monospace", fontSize:9, color:C.textMute, letterSpacing:"0.1em", marginTop:-1 }}>EMISSION ANALYSIS · SUMO</div>
+                </div>
+              </div>
+              <nav style={{ display:"flex", alignItems:"stretch" }}>
+                {["inputs","pipeline","console"].map(t => (
+                  <button key={t} onClick={() => setTab(t)} style={tabStyle(t)}>
+                    {t==="inputs"?"Inputs & Options":t==="pipeline"?"Pipeline":"Console"}
+                    {t==="console" && logs.length>1 && (
+                      <span style={{ background:tab==="console"?C.teal:C.raised, color:tab==="console"?"#fff":C.textMute, borderRadius:10, padding:"1px 7px", fontSize:10, fontFamily:"DM Mono, monospace" }}>{logs.length-1}</span>
+                    )}
+                  </button>
+                ))}
+              </nav>
+              <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:10 }}>
+                <StatusDot status={statusDotColor()} />
+                <span style={{ fontFamily:"DM Mono, monospace", fontSize:11, fontWeight:500, color:{ green:C.green, red:C.red, teal:C.teal, amber:C.amber, gray:C.textMute }[statusDotColor()] }}>{appStatus}</span>
+                {running && <span style={{ width:14, height:14, border:`2px solid ${C.teal}`, borderTopColor:"transparent", borderRadius:"50%", display:"inline-block", animation:"spin 0.8s linear infinite" }} />}
+              </div>
+            </div>
+          </header>
+
+          {/* Content */}
+          <main style={{ flex:1, maxWidth:1060, width:"100%", margin:"0 auto", padding:"28px 32px" }}>
+
+            {/* ── INPUTS ── */}
+            {tab==="inputs" && (
+              <div style={{ animation:"fadeUp 0.22s ease" }}>
+
+                <div style={card}>
+                  <SectionHead icon="📂">Input Files</SectionHead>
+                  <InputRow label="net.xml"    dotColor={lightNet()} value={netXml}   onChange={setNetXml}   placeholder="/path/to/network.net.xml"    onBrowse={() => fetch("/api/browse/net_xml").then(r=>r.json()).then(d=>{ if(d.path) setNetXml(d.path); })}   onClear={() => setNetXml("")} />
+                  <InputRow label="fcd.xml"  dotColor={lightFcd()} value={fcdInput} onChange={setFcdInput} placeholder="/path/to/fcd.xml"  onBrowse={() => fetch("/api/browse/fcd_xml").then(r=>r.json()).then(d=>{ if(d.path) setFcdInput(d.path); })}    onClear={() => setFcdInput("")} />
+                  <InputRow label="output dir" dotColor={lightOut()} value={outDir}   onChange={setOutDir}   placeholder="/path/to/output/"            onBrowse={() => fetch("/api/browse/output_dir").then(r=>r.json()).then(d=>{ if(d.path) setOutDir(d.path); })} onClear={() => setOutDir("")} />
+                  <div style={{ borderTop:`1px solid ${C.border}`, paddingTop:14, marginTop:6 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+                      <Toggle checked={importGt} onChange={setImportGt} />
+                      <span style={{ color:C.textMd, fontSize:13, fontFamily:"DM Sans, sans-serif", fontWeight:500 }}>Ground Truth validation</span>
+                      <span style={{ background:C.panelAlt, color:C.textMute, fontSize:10, padding:"2px 8px", borderRadius:10, fontFamily:"DM Mono, monospace", border:`1px solid ${C.border}` }}>optional</span>
+                    </div>
+                    {importGt && <InputRow label="gt.csv" dotColor={lightGt()} value={gtCsv} onChange={setGtCsv} placeholder="/path/to/ground_truth.csv" onBrowse={() => fetch("/api/browse/gt_csv").then(r=>r.json()).then(d=>{ if(d.path) setGtCsv(d.path); })} onClear={() => setGtCsv("")} />}
+                  </div>
+                </div>
+
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16, marginBottom:16 }}>
+                  <div style={card}>
+                    <SectionHead icon="⚙️">General Options</SectionHead>
+                    <div style={{ marginBottom:16 }}>
+                      <label style={{ display:"block", color:C.textMd, fontSize:11, fontFamily:"DM Mono, monospace", marginBottom:6, fontWeight:500 }}>OUTPUT PREFIX</label>
+                      <input value={prefix} onChange={e => setPrefix(e.target.value)} style={{ ...inputStyle, width:180 }}
+                        onFocus={e => { e.target.style.borderColor=C.teal; e.target.style.background=C.white; e.target.style.boxShadow=`0 0 0 3px ${C.tealLight}`; }}
+                        onBlur={e => { e.target.style.borderColor=C.border; e.target.style.background=C.panelAlt; e.target.style.boxShadow="none"; }}
+                      />
+                    </div>
+                    <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                      {[{val:useSg,set:setUseSg,label:"Savitzky-Golay smoothing"},{val:enablePlots,set:setEnablePlots,label:"Generate plots"}].map(({val,set,label}) => (
+                        <div key={label} style={{ display:"flex", alignItems:"center", gap:10 }}>
+                          <Toggle checked={val} onChange={set} />
+                          <span style={{ color:C.textMd, fontSize:13, fontFamily:"DM Sans, sans-serif" }}>{label}</span>
+                        </div>
+                      ))}
+                      {enablePlots && (
+                        <div style={{ display:"flex", alignItems:"center", gap:10, paddingLeft:48 }}>
+                          <label style={{ color:C.textMute, fontSize:11, fontFamily:"DM Mono, monospace" }}>Plot limit</label>
+                          <input type="number" min="0" value={plotLimit} onChange={e => setPlotLimit(e.target.value)} style={{ ...inputStyle, width:70 }} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={card}>
+                    <SectionHead icon="🌿">Pollutants</SectionHead>
+                    <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom:16 }}>
+                      {POLLUTANTS.map(p => (
+                        <PillCheck key={p} label={p} checked={pollutants[p]} onChange={v => setPollutants(prev => ({...prev,[p]:v}))} />
+                      ))}
+                    </div>
+                    <div style={{ background:C.tealLight, borderRadius:8, padding:"10px 14px", border:`1px solid ${C.borderHi}`, display:"flex", alignItems:"center", gap:10 }}>
+                      <span style={{ fontSize:14 }}>📊</span>
+                      <div>
+                        <div style={{ color:C.textMute, fontSize:10, fontFamily:"DM Mono, monospace", marginBottom:2 }}>ACTIVE</div>
+                        <div style={{ color:C.tealDark, fontSize:12, fontFamily:"DM Mono, monospace", fontWeight:600 }}>{Object.keys(pollutants).filter(k=>pollutants[k]).join("  ·  ") || "None selected"}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Time Filters Section (NEW) */}
+                <div style={card}>
+                  <SectionHead icon="⏱️">Time Range Filters</SectionHead>
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:24 }}>
+                    {/* SUMO Time Filter */}
+                    <div>
+                      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+                        <Toggle checked={enableSumoTime} onChange={setEnableSumoTime} />
+                        <span style={{ color:C.textMd, fontSize:13, fontFamily:"DM Sans, sans-serif", fontWeight:600 }}>SUMO Simulation Time Filter</span>
+                      </div>
+                      {enableSumoTime && (
+                        <div style={{ paddingLeft:48 }}>
+                          <div style={{ marginBottom:10 }}>
+                            <label style={{ display:"block", color:C.textMute, fontSize:11, fontFamily:"DM Mono, monospace", marginBottom:5, fontWeight:500 }}>START TIME (seconds)</label>
+                            <input type="number" min="0" step="1" value={sumoTimeStart} onChange={e => setSumoTimeStart(e.target.value)} placeholder="0 (from beginning)" style={{ ...inputStyle, width:"100%" }} />
+                          </div>
+                          <div>
+                            <label style={{ display:"block", color:C.textMute, fontSize:11, fontFamily:"DM Mono, monospace", marginBottom:5, fontWeight:500 }}>END TIME (seconds)</label>
+                            <input type="number" min="0" step="1" value={sumoTimeEnd} onChange={e => setSumoTimeEnd(e.target.value)} placeholder="∞ (to end)" style={{ ...inputStyle, width:"100%" }} />
+                          </div>
+                          <div style={{ color:C.textHint, fontSize:10, fontFamily:"DM Mono, monospace", marginTop:6 }}>Filter SUMO trajectory data by simulation time</div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* GT Time Filter */}
+                    <div>
+                      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+                        <Toggle checked={enableGtTime} onChange={setEnableGtTime} />
+                        <span style={{ color:C.textMd, fontSize:13, fontFamily:"DM Sans, sans-serif", fontWeight:600 }}>Ground Truth Time Filter</span>
+                      </div>
+                      {enableGtTime && (
+                        <div style={{ paddingLeft:48 }}>
+                          <div style={{ marginBottom:10 }}>
+                            <label style={{ display:"block", color:C.textMute, fontSize:11, fontFamily:"DM Mono, monospace", marginBottom:5, fontWeight:500 }}>START TIME (seconds)</label>
+                            <input type="number" min="0" step="1" value={gtTimeStart} onChange={e => setGtTimeStart(e.target.value)} placeholder="0 (from beginning)" style={{ ...inputStyle, width:"100%" }} />
+                          </div>
+                          <div>
+                            <label style={{ display:"block", color:C.textMute, fontSize:11, fontFamily:"DM Mono, monospace", marginBottom:5, fontWeight:500 }}>END TIME (seconds)</label>
+                            <input type="number" min="0" step="1" value={gtTimeEnd} onChange={e => setGtTimeEnd(e.target.value)} placeholder="∞ (to end)" style={{ ...inputStyle, width:"100%" }} />
+                          </div>
+                          <div style={{ color:C.textHint, fontSize:10, fontFamily:"DM Mono, monospace", marginTop:6 }}>Filter ground truth data by timestamp</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={card}>
+                  <SectionHead icon="🗺️">Spatial Emission Map Settings</SectionHead>
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:32 }}>
+                    <div>
+                      <div style={{ color:C.textMute, fontSize:11, fontFamily:"DM Mono, monospace", fontWeight:500, marginBottom:10, letterSpacing:"0.08em" }}>ANALYSIS AXIS</div>
+                      <div style={{ display:"flex", gap:8, marginBottom:20 }}>
+                        {["x","y","both"].map(a => <RadioPill key={a} label={a} checked={spatialAxis===a} onClick={() => setSpatialAxis(a)} />)}
+                      </div>
+                      <div>
+                        <label style={{ display:"block", color:C.textMute, fontSize:11, fontFamily:"DM Mono, monospace", fontWeight:500, marginBottom:8, letterSpacing:"0.08em" }}>AXIS BIN SIZE (m)</label>
+                        <input type="number" min="0.1" step="1.0" value={axisbin} onChange={e => setAxisbin(e.target.value)} style={{ ...inputStyle, width:110 }}
+                          onFocus={e => { e.target.style.borderColor=C.teal; e.target.style.boxShadow=`0 0 0 3px ${C.tealLight}`; }}
+                          onBlur={e => { e.target.style.borderColor=C.border; e.target.style.boxShadow="none"; }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+                        <Toggle checked={enableRoi} onChange={setEnableRoi} />
+                        <span style={{ color:C.textMd, fontSize:13, fontFamily:"DM Sans, sans-serif" }}>Enable ROI polygon filter</span>
+                      </div>
+                      {enableRoi ? (
+                        <>
+                          <div style={{ display:"flex", gap:8, marginBottom:12 }}>
+                            {["shared","independent"].map(m => (
+                              <RadioPill key={m} label={m} checked={roiMode===m} onClick={() => setRoiMode(m)} />
+                            ))}
+                            <span style={{ color:C.textHint, fontSize:10, fontFamily:"DM Mono, monospace", alignSelf:"center" }}>
+                              {roiMode==="shared" ? "one ROI for all data" : "separate ROI per data source"}
+                            </span>
+                          </div>
+                          <label style={{ display:"block", color:C.textMute, fontSize:11, fontFamily:"DM Mono, monospace", fontWeight:500, marginBottom:4 }}>
+                            {roiMode==="shared" ? "ROI POLYGON (applied to ALL data)" : "SIMULATION ROI (SUMO / TRIM / SG)"}
+                          </label>
+                          <textarea value={roiSim} onChange={e => setRoiSim(e.target.value)} rows={2} placeholder="x1,y1;x2,y2;x3,y3;..."
+                            style={{ ...inputStyle, width:"100%", resize:"vertical", marginBottom:8 }}
+                            onFocus={e => { e.target.style.borderColor=C.teal; e.target.style.boxShadow=`0 0 0 3px ${C.tealLight}`; }}
+                            onBlur={e => { e.target.style.borderColor=C.border; e.target.style.boxShadow="none"; }}
+                          />
+                          {roiMode==="independent" && (
+                            <>
+                              <label style={{ display:"block", color:C.textMute, fontSize:11, fontFamily:"DM Mono, monospace", fontWeight:500, marginBottom:4 }}>GT ROI (GROUND TRUTH)</label>
+                              <textarea value={roiGt} onChange={e => setRoiGt(e.target.value)} rows={2} placeholder="x1,y1;x2,y2;x3,y3;..."
+                                style={{ ...inputStyle, width:"100%", resize:"vertical", marginBottom:8 }}
+                                onFocus={e => { e.target.style.borderColor=C.teal; e.target.style.boxShadow=`0 0 0 3px ${C.tealLight}`; }}
+                                onBlur={e => { e.target.style.borderColor=C.border; e.target.style.boxShadow="none"; }}
+                              />
+                            </>
+                          )}
+                          <div style={{ color:C.textHint, fontSize:10, fontFamily:"DM Mono, monospace" }}>Format: x1,y1;x2,y2;… — SUMO coordinate system</div>
+                        </>
+                      ) : (
+                        <div style={{ background:C.canvas, border:`1.5px dashed ${C.border}`, borderRadius:8, padding:"20px 16px", textAlign:"center", color:C.textHint, fontSize:12, fontFamily:"DM Mono, monospace" }}>No spatial filter applied</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ borderRadius:10, padding:"14px 20px", background:isReady?C.greenBg:C.redBg, border:`1.5px solid ${isReady?C.greenMid:"#fca5a5"}`, display:"flex", alignItems:"center", justifyContent:"space-between", boxShadow:`0 2px 8px ${isReady?"#22c55e18":"#dc262618"}` }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                    <span style={{ fontSize:18 }}>{isReady?"✅":"⚠️"}</span>
+                    <span style={{ fontFamily:"DM Sans, sans-serif", fontSize:13, fontWeight:600, color:isReady?C.green:C.red }}>{isReady?"All inputs valid — ready to run":"Please complete required input fields"}</span>
+                  </div>
+                  <Btn onClick={() => isReady && setTab("pipeline")} disabled={!isReady}>Go to Pipeline →</Btn>
+                </div>
+              </div>
+            )}
+
+            {/* ── PIPELINE ── */}
+            {tab==="pipeline" && (
+              <div style={{ animation:"fadeUp 0.22s ease" }}>
+                <div style={{ ...card, display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+                  <Btn onClick={() => runPipeline(null)} disabled={!isReady||running}>▶ Run All</Btn>
+                  <Btn variant="ghost" disabled={!isReady||running} onClick={() => { const sel=STEPS.filter(s=>stepEnabled[s.id]).map(s=>s.id); runPipeline(sel); }}>▶ Run Selected</Btn>
+                  {canResume && !running && <Btn variant="resume" onClick={resumePipeline}>▶▶ Resume</Btn>}
+                  <Btn variant="danger" disabled={!running} onClick={stopPipeline}>❚❚ Pause</Btn>
+                  <div style={{ width:1, height:28, background:C.border }} />
+                  <Btn variant="ghost" onClick={() => {
+                    fetch("/api/status").then(r=>r.json()).then(d => {
+                      addLog(`📊 Backend Status: ${d.app_status}`, "info");
+                      addLog(`   Running: ${d.is_running}`, "info");
+                      addLog(`   Can Resume: ${d.can_resume}`, "info");
+                      const stepsDone = Object.values(d.step_status).filter(s=>s==="done").length;
+                      const stepsTotal = Object.keys(d.step_status).length;
+                      addLog(`   Steps: ${stepsDone}/${stepsTotal} done`, "info");
+                      setTab("console");
+                    }).catch(e => {
+                      addLog(`❌ Failed to check status: ${e}`, "error");
+                      setTab("console");
+                    });
+                  }}>🔍 Check Status</Btn>
+                  <Btn variant="ghost" onClick={() => { if(outDir) window.open(`file://${outDir}`, '_blank'); }}>⎘ Open Output Dir</Btn>
+                  <div style={{ marginLeft:"auto" }}>
+                    {!isReady && <span style={{ color:C.red, fontSize:12, fontFamily:"DM Sans, sans-serif", fontWeight:600 }}>⚠ Inputs incomplete</span>}
+                    {canResume && !running && <span style={{ color:C.amber, fontSize:12, fontFamily:"DM Sans, sans-serif", fontWeight:600, animation:"pulse 1.5s infinite" }}>⏸ Pipeline paused — Resume available</span>}
+                  </div>
+                </div>
+
+                <ProgressBar steps={STEPS} stepStatus={stepStatus} />
+
+                <div style={{ background:C.white, border:`1px solid ${C.border}`, borderRadius:10, overflow:"hidden", boxShadow:"0 1px 4px rgba(8,145,178,0.06)" }}>
+                  <div style={{ display:"grid", gridTemplateColumns:"52px 36px 1fr 100px", padding:"9px 20px", background:C.panelAlt, borderBottom:`1.5px solid ${C.border}`, color:C.textMute, fontSize:10, fontFamily:"DM Sans, sans-serif", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase" }}>
+                    <span>Use</span><span></span><span>Step</span><span style={{ textAlign:"center" }}>Status</span>
+                  </div>
+                  {STEPS.map((s, i) => {
+                    const st = stepStatus[s.id] || "pending";
+                    return (
+                      <div key={s.id} className="step-row" style={{ display:"grid", gridTemplateColumns:"52px 36px 1fr 100px", padding:"12px 20px", borderBottom:i<STEPS.length-1?`1px solid ${C.border}`:"none", background:st==="running"?C.amberBg:st==="done"?C.greenBg:s.optional?C.canvas:C.white, alignItems:"center" }}>
+                        <Toggle checked={stepEnabled[s.id]} onChange={v => setStepEnabled(p => ({...p,[s.id]:v}))} />
+                        <span style={{ fontSize:16, color:st==="running"?C.amber:st==="done"?C.green:s.optional?C.textHint:C.teal, animation:st==="running"?"spin 1s linear infinite":"none", display:"inline-block" }}>{st==="running"?"◌":s.icon}</span>
+                        <div>
+                          <div style={{ fontFamily:"DM Sans, sans-serif", fontSize:13, fontWeight:600, color:s.optional?C.textMute:C.text }}>
+                            {s.title}
+                            {s.optional && <span style={{ marginLeft:8, fontSize:10, color:C.textHint, background:C.canvas, border:`1px solid ${C.border}`, padding:"1px 7px", borderRadius:10, fontFamily:"DM Mono, monospace", fontWeight:400 }}>optional</span>}
+                          </div>
+                          <div style={{ color:C.textMute, fontSize:11, fontFamily:"DM Mono, monospace", marginTop:2 }}>{s.sub}</div>
+                        </div>
+                        <div style={{ textAlign:"center" }}><StepBadge status={st} /></div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ── CONSOLE ── */}
+            {tab==="console" && (
+              <div style={{ animation:"fadeUp 0.22s ease" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                    <StatusDot status={running?"teal":"gray"} />
+                    <span style={{ fontFamily:"DM Sans, sans-serif", fontWeight:700, fontSize:13, color:C.textMd }}>Pipeline Console</span>
+                  </div>
+                  <Btn variant="ghost" small onClick={() => setLogs([{ts:now(),type:"info",msg:"Console cleared."}])}>Clear</Btn>
+                </div>
+                <div ref={consoleRef} style={{ background:"#0d1b2a", border:"1px solid #1e3a4a", borderRadius:10, padding:"18px 22px", height:"calc(100vh - 230px)", overflowY:"auto", fontFamily:"DM Mono, monospace", fontSize:14, lineHeight:"24px", boxShadow:"inset 0 2px 12px rgba(0,0,0,0.3)", letterSpacing:"0.01em" }}>
+                  {logs.map((l,i) => {
+                    const badges = { system:"SYS", success:"DONE", error:"ERR", warn:"WARN", run:"RUN", info:"INFO" };
+                    const badge = badges[l.type] || "LOG";
+                    const badgeColor = logColor(l.type);
+                    return (
+                      <div key={i} style={{ display:"flex", gap:12, alignItems:"flex-start", marginBottom:1, padding:"3px 0" }}>
+                        <span style={{ color:"#4a6070", flexShrink:0, fontSize:12, fontWeight:600, paddingTop:1, minWidth:62, letterSpacing:"0.03em" }}>{l.ts}</span>
+                        <span style={{ color:badgeColor, flexShrink:0, fontSize:11, fontWeight:700, minWidth:40, paddingTop:1, letterSpacing:"0.06em" }}>{badge}</span>
+                        <span style={{ color:logColor(l.type), flex:1, wordBreak:"break-word", whiteSpace:"pre-wrap", opacity: l.type==="info" ? 0.88 : 1 }}>{l.msg}</span>
+                      </div>
+                    );
+                  })}
+                  {running && (
+                    <div style={{ display:"flex", gap:10, alignItems:"center", marginTop:4, opacity:0.7 }}>
+                      <span style={{ color:"#4a6070", fontSize:12, fontWeight:600, minWidth:62 }}>{now()}</span>
+                      <span style={{ color:"#38bdf8", fontSize:10, fontWeight:700, minWidth:36 }}>RUN</span>
+                      <span style={{ color:"#67e8f9" }}>Pipeline running{tick%3===0?"   ":tick%3===1?".  ":".. "}</span>
+                    </div>
+                  )}
+                </div>
+                <div style={{ marginTop:10, display:"flex", gap:20, padding:"10px 18px", background:C.white, border:`1px solid ${C.border}`, borderRadius:8, alignItems:"center" }}>
+                  {[{label:"Total logs",val:logs.length,color:C.textMd},{label:"Steps done",val:Object.values(stepStatus).filter(s=>s==="done").length,color:C.green},{label:"Errors",val:Object.values(stepStatus).filter(s=>s==="error").length,color:C.red}].map(({label,val,color}) => (
+                    <div key={label} style={{ display:"flex", alignItems:"baseline", gap:8 }}>
+                      <span style={{ fontFamily:"DM Sans, sans-serif", fontWeight:800, fontSize:18, color }}>{val}</span>
+                      <span style={{ color:C.textMute, fontSize:11, fontFamily:"DM Mono, monospace" }}>{label}</span>
+                    </div>
+                  ))}
+                  <div style={{ marginLeft:"auto" }}>
+                    <Btn variant="ghost" small onClick={() => setTab("pipeline")}>← Back to Pipeline</Btn>
+                  </div>
+                </div>
+              </div>
+            )}
+          </main>
+
+          {/* Footer */}
+          <footer style={{ borderTop:`1px solid ${C.border}`, padding:"10px 32px", background:C.white, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+            <span style={{ color:C.textMute, fontSize:11, fontFamily:"DM Mono, monospace" }}>TRIM v1.0 · Trajectory Refinement for Emission Modeling</span>
+            <div style={{ display:"flex", gap:8 }}>
+              {Object.keys(pollutants).filter(k=>pollutants[k]).map(p => (
+                <span key={p} style={{ background:C.tealLight, color:C.tealDark, border:`1px solid ${C.borderHi}`, borderRadius:10, padding:"2px 9px", fontSize:10, fontFamily:"DM Mono, monospace", fontWeight:600 }}>{p}</span>
+              ))}
+            </div>
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

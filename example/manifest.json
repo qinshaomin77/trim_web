@@ -1,0 +1,247 @@
+[
+  {
+    "step_id": "gt_standardize",
+    "title": "OPTIONAL: standardize ground truth",
+    "time_start": 1772695585.9348812,
+    "time_end": 1772695593.6982994,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\optional\\gt_standardize\\00_ground_truth\\ground_truth_std.csv"
+  },
+  {
+    "step_id": "net_topology",
+    "title": "NET: net.xml -> topology tables",
+    "time_start": 1772695593.6982994,
+    "time_end": 1772695593.7352371,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\00_net_topology"
+  },
+  {
+    "step_id": "gt_standardize",
+    "title": "OPTIONAL: standardize ground truth",
+    "time_start": 1772696115.8026402,
+    "time_end": 1772696124.835322,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\optional\\gt_standardize\\00_ground_truth\\ground_truth_std.csv"
+  },
+  {
+    "step_id": "net_topology",
+    "title": "NET: net.xml -> topology tables",
+    "time_start": 1772696124.8403277,
+    "time_end": 1772696124.9132607,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\00_net_topology"
+  },
+  {
+    "step_id": "xml2csv_fcd",
+    "title": "STEP-00: fcd.xml -> CSV",
+    "time_start": 1772696124.9151945,
+    "time_end": 1772696144.5738392,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\01_xml2csv\\fcd_fcd_standardized.csv"
+  },
+  {
+    "step_id": "identify_neighbors",
+    "title": "STEP-01: identify neighbors",
+    "time_start": 1772696144.5748374,
+    "time_end": 1772696289.7261899,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\02_identify_neighbors\\fcd_neighbors.csv"
+  },
+  {
+    "step_id": "trip_split",
+    "title": "STEP-02: trip split (trip_id)",
+    "time_start": 1772696289.7271967,
+    "time_end": 1772696321.6388009,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\03_trip_split\\fcd_trip_split.csv"
+  },
+  {
+    "step_id": "sg_smooth",
+    "title": "OPTIONAL: SG smooth",
+    "time_start": 1772696321.6397994,
+    "time_end": 1772696351.1235895,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\optional\\sg_smooth\\fcd_sg_smooth.csv"
+  },
+  {
+    "step_id": "trim_postprocess",
+    "title": "TRIM: optimize & postprocess trajectories",
+    "time_start": 1772696351.1235895,
+    "time_end": 1772696445.162496,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\04_trim\\fcd_trim_all.csv"
+  },
+  {
+    "step_id": "fill_xy",
+    "title": "STEP-03: merge/fill XY",
+    "time_start": 1772696445.163494,
+    "time_end": 1772696476.8810403,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\05_fill_xy\\fcd_filled_xy.csv"
+  },
+  {
+    "step_id": "ef_match",
+    "title": "STEP-04: emission factor match",
+    "time_start": 1772696476.8820527,
+    "time_end": 1772696503.1640418,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\06_ef_match\\fcd_emission_matched.csv"
+  },
+  {
+    "step_id": "emission_spatial_map",
+    "title": "STEP-05: spatial emission map",
+    "time_start": 1772696503.1870487,
+    "time_end": 1772696547.031422,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\07_emission_spatial_map"
+  },
+  {
+    "step_id": "emission_compare",
+    "title": "STEP-06: emission compare (optional GT)",
+    "time_start": 1772696547.0324204,
+    "time_end": 1772696548.6290286,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\08_emission_compare"
+  },
+  {
+    "step_id": "gt_standardize",
+    "title": "OPTIONAL: standardize ground truth",
+    "time_start": 1772697349.4881837,
+    "time_end": 1772697357.4059305,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\optional\\gt_standardize\\00_ground_truth\\ground_truth_std.csv"
+  },
+  {
+    "step_id": "net_topology",
+    "title": "NET: net.xml -> topology tables",
+    "time_start": 1772697357.4069295,
+    "time_end": 1772697357.441873,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\00_net_topology"
+  },
+  {
+    "step_id": "xml2csv_fcd",
+    "title": "STEP-00: fcd.xml -> CSV",
+    "time_start": 1772697357.441873,
+    "time_end": 1772697376.9763436,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\01_xml2csv\\fcd_fcd_standardized.csv"
+  },
+  {
+    "step_id": "identify_neighbors",
+    "title": "STEP-01: identify neighbors",
+    "time_start": 1772697376.9764566,
+    "time_end": 1772697525.684316,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\02_identify_neighbors\\fcd_neighbors.csv"
+  },
+  {
+    "step_id": "trip_split",
+    "title": "STEP-02: trip split (trip_id)",
+    "time_start": 1772697525.6853147,
+    "time_end": 1772697557.5730915,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\03_trip_split\\fcd_trip_split.csv"
+  },
+  {
+    "step_id": "sg_smooth",
+    "title": "OPTIONAL: SG smooth",
+    "time_start": 1772697557.5740893,
+    "time_end": 1772697586.8925726,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\optional\\sg_smooth\\fcd_sg_smooth.csv"
+  },
+  {
+    "step_id": "trim_postprocess",
+    "title": "TRIM: optimize & postprocess trajectories",
+    "time_start": 1772697586.8935716,
+    "time_end": 1772697676.3966632,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\04_trim\\fcd_trim_all.csv"
+  },
+  {
+    "step_id": "fill_xy",
+    "title": "STEP-03: merge/fill XY",
+    "time_start": 1772697676.3986623,
+    "time_end": 1772697708.016765,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\05_fill_xy\\fcd_filled_xy.csv"
+  },
+  {
+    "step_id": "ef_match",
+    "title": "STEP-04: emission factor match",
+    "time_start": 1772697708.0177634,
+    "time_end": 1772697734.0944676,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\06_ef_match\\fcd_emission_matched.csv"
+  },
+  {
+    "step_id": "emission_spatial_map",
+    "title": "STEP-05: spatial emission map",
+    "time_start": 1772697734.095466,
+    "time_end": 1772697778.7283394,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\07_emission_spatial_map"
+  },
+  {
+    "step_id": "emission_compare",
+    "title": "STEP-06: emission compare (optional GT)",
+    "time_start": 1772697778.7293384,
+    "time_end": 1772697780.2890124,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\08_emission_compare"
+  },
+  {
+    "step_id": "gt_standardize",
+    "title": "OPTIONAL: standardize ground truth",
+    "time_start": 1772699957.8111234,
+    "time_end": 1772699966.0168366,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\optional\\gt_standardize\\00_ground_truth\\ground_truth_std.csv"
+  },
+  {
+    "step_id": "net_topology",
+    "title": "NET: net.xml -> topology tables",
+    "time_start": 1772699966.0178516,
+    "time_end": 1772699966.0557702,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\00_net_topology"
+  },
+  {
+    "step_id": "xml2csv_fcd",
+    "title": "STEP-00: fcd.xml -> CSV",
+    "time_start": 1772699966.0597677,
+    "time_end": 1772699985.7129002,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\01_xml2csv\\fcd_fcd_standardized.csv"
+  },
+  {
+    "step_id": "identify_neighbors",
+    "title": "STEP-01: identify neighbors",
+    "time_start": 1772699985.7138984,
+    "time_end": 1772700126.8610857,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\02_identify_neighbors\\fcd_neighbors.csv"
+  },
+  {
+    "step_id": "trip_split",
+    "title": "STEP-02: trip split (trip_id)",
+    "time_start": 1772700126.8620918,
+    "time_end": 1772700159.0748653,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\03_trip_split\\fcd_trip_split.csv"
+  },
+  {
+    "step_id": "sg_smooth",
+    "title": "OPTIONAL: SG smooth",
+    "time_start": 1772700159.0758705,
+    "time_end": 1772700188.7136366,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\optional\\sg_smooth\\fcd_sg_smooth.csv"
+  },
+  {
+    "step_id": "trim_postprocess",
+    "title": "TRIM: optimize & postprocess trajectories",
+    "time_start": 1772700188.7146475,
+    "time_end": 1772700289.6103473,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\04_trim\\fcd_trim_all.csv"
+  },
+  {
+    "step_id": "fill_xy",
+    "title": "STEP-03: merge/fill XY",
+    "time_start": 1772700289.6123445,
+    "time_end": 1772700321.5012236,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\05_fill_xy\\fcd_filled_xy.csv"
+  },
+  {
+    "step_id": "ef_match",
+    "title": "STEP-04: emission factor match",
+    "time_start": 1772700321.5022223,
+    "time_end": 1772700347.5959392,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\06_ef_match\\fcd_emission_matched.csv"
+  },
+  {
+    "step_id": "emission_spatial_map",
+    "title": "STEP-05: spatial emission map",
+    "time_start": 1772700347.5979362,
+    "time_end": 1772700392.4535627,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\07_emission_spatial_map"
+  },
+  {
+    "step_id": "emission_compare",
+    "title": "STEP-06: emission compare (optional GT)",
+    "time_start": 1772700392.454561,
+    "time_end": 1772700394.0671635,
+    "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\08_emission_compare"
+  }
+]
