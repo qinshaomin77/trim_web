@@ -1,0 +1,35 @@
+2026-03-05 21:25:55,744 | INFO | === Ground Truth Standardization BEGIN =======
+2026-03-05 21:25:55,744 | INFO | in_csv  : E:\DRL_project\TRIM_web\example\sumo_mcg\uav_fcd.csv
+2026-03-05 21:25:55,744 | INFO | out_dir : E:\DRL_project\TRIM_web\example\optional\gt_standardize\00_ground_truth
+2026-03-05 21:25:55,745 | INFO | speed_unit_in: m/s (default m/s)
+2026-03-05 21:25:55,745 | INFO | prefer  : speed
+2026-03-05 21:25:55,745 | INFO | initial_speed (for accel->speed integral): 0.0
+2026-03-05 21:25:55,745 | INFO | clip_speed_nonneg: True
+2026-03-05 21:25:55,745 | INFO | keep_input_jerk: False
+2026-03-05 21:25:55,745 | INFO | encoding: utf-8-sig
+2026-03-05 21:25:56,399 | INFO | Read rows: 172599, cols: 11
+2026-03-05 21:25:56,487 | INFO | Column mapping used:
+2026-03-05 21:25:56,487 | INFO |     timestep_time <= timestep_time
+2026-03-05 21:25:56,487 | INFO |        vehicle_id <= vehicle_id
+2026-03-05 21:25:56,487 | INFO |     vehicle_speed <= vehicle_speed
+2026-03-05 21:25:56,487 | INFO |     vehicle_accel <= vehicle_acceleration
+2026-03-05 21:25:56,487 | INFO |      vehicle_jerk <= None
+2026-03-05 21:25:56,487 | INFO |   vehicle_odometer <= None
+2026-03-05 21:25:56,487 | INFO |      vehicle_type <= vehicle_type
+2026-03-05 21:25:56,487 | INFO |         vehicle_x <= vehicle_x
+2026-03-05 21:25:56,487 | INFO |         vehicle_y <= vehicle_y
+2026-03-05 21:25:56,535 | INFO | Speed unit assumed as m/s. (unit_in=m/s)
+2026-03-05 21:25:56,589 | INFO | Speed p95 (m/s after conversion) = 12.321
+2026-03-05 21:25:56,819 | INFO | dt stats: {'dt_min': 1.0, 'dt_median': 1.0, 'dt_max': 1.0, 'dt_nonpos_count': 0}
+2026-03-05 21:25:57,111 | INFO | vehicle_type counts (before): {'小轿车': 145621, '厢式货车': 18656, 'MPV商务车': 8322}
+2026-03-05 21:25:57,111 | INFO | vehicle_type counts (after) : {'sedan': 145621, 'truck': 18656, 'MPV': 8322}
+2026-03-05 21:26:03,450 | INFO | vehicle_odometer missing -> derive from vehicle_speed integration.
+2026-03-05 21:26:08,127 | INFO | Vehicles detected: 4218
+2026-03-05 21:26:08,128 | INFO | Output rows: 172599
+2026-03-05 21:26:08,128 | INFO | Derived columns:
+2026-03-05 21:26:08,128 | INFO |   - vehicle_accel (recomputed from vehicle_speed due to prefer=speed)
+2026-03-05 21:26:08,128 | INFO |   - vehicle_odometer (integral of vehicle_speed over dt)
+2026-03-05 21:26:08,128 | INFO |   - vehicle_type (mapped to {sedan, MPV, truck}; default sedan)
+2026-03-05 21:26:08,128 | INFO |   - vehicle_jerk (placeholder NaN; jerk not computed)
+2026-03-05 21:26:09,498 | INFO | Saved standardized CSV: E:\DRL_project\TRIM_web\example\optional\gt_standardize\00_ground_truth\ground_truth_std.csv
+2026-03-05 21:26:09,514 | INFO | Saved report JSON: E:\DRL_project\TRIM_web\example\optional\gt_standardize\00_ground_truth\ground_truth_std_report.json

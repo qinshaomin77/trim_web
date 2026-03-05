@@ -15,6 +15,7 @@
 ## 📋 Table of Contents
 
 - [Overview](#overview)
+- [Demo](#demo)
 - [Prerequisites](#prerequisites)
 - [Dependencies](#dependencies)
 - [Installation](#installation)
@@ -40,6 +41,17 @@ TRIM is a simulation-independent toolkit designed for vehicle speed trajectory r
 - 🖥️ Interactive GUI and web-based visualization
 - 🔧 Multiple optimization algorithms
 - 🔗 Seamless SUMO integration
+
+---
+
+## 🎬 Demo
+
+Watch the end-to-end TRIM workflow in action — from loading raw SUMO trajectories to physically refined speed profiles and emission estimation:
+
+[![TRIM Demo](https://img.shields.io/badge/YouTube-Watch%20Demo-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=KDPiDGzVudo)
+
+> **[▶ TRIM: End-to-End Trajectory Refinement Demo](https://www.youtube.com/watch?v=KDPiDGzVudo)**  
+> Raw SUMO FCD output → Two-stage MIQP optimization → Emission estimation & spatial mapping
 
 ---
 
@@ -276,13 +288,10 @@ For detailed documentation, please refer to:
 If you use TRIM in your research, please cite:
 
 ```bibtex
-@software{trim2024,
-  author = {Qin, Shaomin and Liu, Haobing and Yue, Lishengsa},
-  title = {TRIM: A Simulation-Independent Toolkit for Vehicle Speed Trajectory 
-           Refinement in Emission Modeling},
-  year = {2024},
-  url = {https://github.com/qinshaomin77/trim_web},
-  version = {1.0.0}
+@article{qin2026trim,
+  title  = {TRIM: A Simulation-Independent Toolkit for Vehicle Speed Trajectory Refinement in Emission Modeling},
+  author = {Shaomin Qin and Haobing Liu and Lishengsa Yue},
+  year   = {2026},
 }
 ```
 
@@ -335,7 +344,6 @@ GurobiError: No Gurobi license found
 3. Place it in your home directory or set `GRB_LICENSE_FILE` environment variable
 
 ```bash
-# Set license file location
 export GRB_LICENSE_FILE=/path/to/gurobi.lic
 ```
 
@@ -423,9 +431,11 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 🙏 Acknowledgments
 
+This research is partially supported by:
+- National Key R&D Program of China (No. `2023YFB3906900`)
+- National Natural Science Foundation of China (No. `52572378`)
 - **SUMO Development Team** for the excellent traffic simulation platform
 - **Gurobi Optimization** for providing academic licenses
-- **All contributors** who have helped improve this project
 
 ---
 
@@ -442,7 +452,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📝 Changelog
 
-### Version 1.0.0 (2024-03-05)
+### Version 1.0.0 (2026)
 - Initial release
 - Core trajectory optimization algorithms
 - GUI and web interface
@@ -453,8 +463,10 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 <div align="center">
 
-**Made with ❤️ by the TRIM Team**
+**Made with ❤️ by the VISTA Team**
 
 ⭐ **Star this repository if you find it helpful!**
+
+© 2026 Shaomin Qin · Haobing Liu · Lishengsa Yue · All rights reserved.
 
 </div>

@@ -1,0 +1,36 @@
+{
+  "in_csv": "E:\\DRL_project\\TRIM_web\\example\\sumo_mcg\\uav_fcd.csv",
+  "out_csv": "E:\\DRL_project\\TRIM_web\\example\\optional\\gt_standardize\\00_ground_truth\\ground_truth_std.csv",
+  "rows_in": 172599,
+  "rows_out": 172599,
+  "n_vehicles": 4218,
+  "speed_unit_in": "m/s",
+  "speed_unit_out": "m/s",
+  "speed_converted": false,
+  "prefer": "speed",
+  "initial_speed": 0.0,
+  "derived_cols": [
+    "vehicle_accel (recomputed from vehicle_speed due to prefer=speed)",
+    "vehicle_odometer (integral of vehicle_speed over dt)",
+    "vehicle_type (mapped to {sedan, MPV, truck}; default sedan)",
+    "vehicle_jerk (placeholder NaN; jerk not computed)"
+  ],
+  "used_colmap": {
+    "timestep_time": "timestep_time",
+    "vehicle_id": "vehicle_id",
+    "vehicle_speed": "vehicle_speed",
+    "vehicle_accel": "vehicle_acceleration",
+    "vehicle_jerk": null,
+    "vehicle_odometer": null,
+    "vehicle_type": "vehicle_type",
+    "vehicle_x": "vehicle_x",
+    "vehicle_y": "vehicle_y"
+  },
+  "dt_stats": {
+    "dt_min": 1.0,
+    "dt_median": 1.0,
+    "dt_max": 1.0,
+    "dt_nonpos_count": 0
+  },
+  "warnings": []
+}

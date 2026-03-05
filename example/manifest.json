@@ -243,5 +243,26 @@
     "time_start": 1772700392.454561,
     "time_end": 1772700394.0671635,
     "output": "F:\\qsm_file\\code_project\\TRIM_web\\example\\08_emission_compare"
+  },
+  {
+    "step_id": "gt_standardize",
+    "title": "OPTIONAL: standardize ground truth",
+    "time_start": 1772717155.7426045,
+    "time_end": 1772717169.5181556,
+    "output": "E:\\DRL_project\\TRIM_web\\example\\optional\\gt_standardize\\00_ground_truth\\ground_truth_std.csv"
+  },
+  {
+    "step_id": "net_topology",
+    "title": "NET: net.xml -> topology tables",
+    "time_start": 1772717169.534494,
+    "time_end": 1772717170.0139813,
+    "output": "E:\\DRL_project\\TRIM_web\\example\\00_net_topology"
+  },
+  {
+    "step_id": "xml2csv_fcd",
+    "title": "STEP-00: fcd.xml -> CSV",
+    "time_start": 1772717170.0149994,
+    "time_end": 1772717197.0467532,
+    "output": "E:\\DRL_project\\TRIM_web\\example\\01_xml2csv\\fcd_fcd_standardized.csv"
   }
 ]
